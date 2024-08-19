@@ -69,10 +69,10 @@ public class Marina {
         // features
         new Permissions();
         new DevelopmentFeature();
-        new HttpFeature();
+//        new HttpFeature();
         new DockerFeature();
 //        try { new PasteFeature(); } catch (IOException e) { e.printStackTrace(); }
-        new DoNotMentionFeature();
+//        new DoNotMentionFeature();
 //        new TagsFeature();
 //        new StatisticsFeature();
     }

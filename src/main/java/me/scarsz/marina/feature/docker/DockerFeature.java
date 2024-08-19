@@ -13,6 +13,7 @@ import com.github.dockerjava.core.DockerClientBuilder;
 import me.scarsz.marina.Command;
 import me.scarsz.marina.exception.InsufficientPermissionException;
 import me.scarsz.marina.feature.AbstractFeature;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.ISnowflake;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -22,6 +23,7 @@ import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.selections.SelectOption;
 import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
 
+import java.awt.*;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -57,12 +59,19 @@ public class DockerFeature extends AbstractFeature {
                 .map(this::getContainerName)
                 .collect(Collectors.toSet());
 
+        EmbedBuilder embedBuilder = new EmbedBuilder();
         if (containers.size() > 0) {
-            event.getHook().editOriginal("✅ Available containers: `" + String.join("`, `", containers) + "`").queue();
+            embedBuilder.setTitle("✅ Available containers:")
+                    .setDescription(String.join("\n", containers))
+                    .setColor(Color.GREEN);
+            event.getHook().editOriginalEmbeds(embedBuilder.build()).queue();
         } else {
-            event.getHook().editOriginal("❌ You don't have access to any containers.").queue();
+            embedBuilder.setTitle("❌ You don't have access to any containers.")
+                    .setColor(Color.RED);
+            event.getHook().editOriginalEmbeds(embedBuilder.build()).queue();
         }
     }
+
     @Command(name = "container.restart")
     public void restartCommand(SlashCommandInteractionEvent event) throws IllegalArgumentException, InsufficientPermissionException {
         OptionMapping containerOption = event.getOption("container");
@@ -72,24 +81,30 @@ public class DockerFeature extends AbstractFeature {
             checkPermission(event.getUser(), "docker.container." + container.replace("-", ".") + ".lifecycle");
             inspectContainer(container);
 
-            event.getHook().editOriginal("🤔 Restarting `" + container + "`").complete();
+            EmbedBuilder embedBuilder = new EmbedBuilder()
+                    .setColor(Color.YELLOW)
+                    .setTitle("🤔 Restarting `" + container + "`");
+            event.getHook().editOriginalEmbeds(embedBuilder.build()).complete();
             dockerClient.restartContainerCmd(container).withtTimeout(30).exec();
-            event.getHook().editOriginal("✅ Restarted `" + container + "`").complete();
+            embedBuilder.setColor(Color.GREEN)
+                    .setTitle("✅ Restarted `" + container + "`");
+            event.getHook().editOriginalEmbeds(embedBuilder.build()).complete();
         } else {
             List<Container> containers = listContainers(null, event.getUser());
             event.getHook().editOriginalComponents(ActionRow.of(StringSelectMenu.create("list-" + event.getChannel().getId() + "-" + event.getUser().getId())
                     .setPlaceholder("Which container do you want to restart?")
                     .setRequiredRange(1, 1)
                     .addOptions(containers.stream().map(container ->
-                            SelectOption.of("restart-" + container.getId(), getContainerName(container.getId()))
-                                    .withDescription(container.getImage())
-                            )
-                            .collect(Collectors.toSet())
+                                            SelectOption.of("restart-" + container.getId(), getContainerName(container.getId()))
+                                                    .withDescription(container.getImage())
+                                    )
+                                    .collect(Collectors.toSet())
                     )
                     .build()
             )).queue();
         }
     }
+
     @Command(name = "container.update")
     public void updateCommand(SlashCommandInteractionEvent event) throws IllegalArgumentException, InsufficientPermissionException {
         String container = event.getOption("container").getAsString(); //TODO allow null container & selections
@@ -99,12 +114,17 @@ public class DockerFeature extends AbstractFeature {
         try {
             dockerClient.inspectImageCmd("containrrr/watchtower").exec();
         } catch (NotFoundException e) {
-            event.getHook().editOriginal("🤔 Updater image doesn't exist, pulling...").complete();
+            EmbedBuilder builder = new EmbedBuilder()
+                    .setColor(Color.YELLOW)
+                    .setTitle("🤔 Updater image doesn't exist, pulling...");
+            event.getHook().editOriginalEmbeds(builder.build()).complete();
 
             try {
                 dockerClient.pullImageCmd("containrrr/watchtower").start().awaitCompletion(30, TimeUnit.SECONDS);
             } catch (InterruptedException e2) {
-                event.getHook().editOriginal("❌ Timed out while pulling updater image").complete();
+                builder.setColor(Color.RED)
+                        .setTitle("❌ Timed out while pulling updater image");
+                event.getHook().editOriginalEmbeds(builder.build()).complete();
                 e2.printStackTrace();
                 return;
             }
@@ -129,10 +149,17 @@ public class DockerFeature extends AbstractFeature {
             public void onComplete() {
                 InspectContainerResponse postInspection = inspectContainer(container);
 
+                EmbedBuilder builder = new EmbedBuilder();
                 if (preInspection.getId().equals(postInspection.getId())) {
-                    event.getHook().editOriginal("❌ No newer image found for `" + container + "@" + preInspection.getImageId() + "`").queue();
+                    builder.setColor(Color.RED)
+                            .setTitle("❌ No newer image found for `" + container + "@" + preInspection.getImageId() + "`");
+                    event.getHook().editOriginalEmbeds(builder.build()).queue();
                 } else {
-                    event.getHook().editOriginal("✅ Updated `" + container + "`").queue();
+                    builder.setColor(Color.GREEN)
+                            .setTitle("✅ Updated `" + container + "`")
+                            .addField("Old image", preInspection.getImageId(), true)
+                            .addField("New image", postInspection.getImageId(), true);
+                    event.getHook().editOriginalEmbeds(builder.build()).queue();
                 }
             }
         });
@@ -151,11 +178,13 @@ public class DockerFeature extends AbstractFeature {
         if (nameFilter != null) cmd.withNameFilter(Collections.singletonList(nameFilter));
         return cmd.exec();
     }
+
     private List<Container> listContainers(String nameFilter, ISnowflake snowflake) {
         return listContainers(nameFilter).stream()
                 .filter(container -> hasPermission(snowflake, "docker.container." + getContainerName(container).replace("-", ".") + ".inspect"))
                 .collect(Collectors.toList());
     }
+
     private InspectContainerResponse inspectContainer(String container) throws IllegalArgumentException {
         try {
             return dockerClient.inspectContainerCmd(container).exec();
@@ -169,6 +198,7 @@ public class DockerFeature extends AbstractFeature {
         if (name.startsWith("/")) name = name.substring(1);
         return name;
     }
+
     private String getContainerName(String s) {
         return inspectContainer(s).getName().toLowerCase(Locale.ROOT);
     }

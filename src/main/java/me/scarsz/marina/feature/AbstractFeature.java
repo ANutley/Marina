@@ -4,12 +4,14 @@ import me.scarsz.marina.Command;
 import me.scarsz.marina.Marina;
 import me.scarsz.marina.exception.InsufficientPermissionException;
 import me.scarsz.marina.feature.permissions.Permissions;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.ISnowflake;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
 
+import java.awt.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.StringJoiner;
@@ -32,26 +34,37 @@ public abstract class AbstractFeature extends ListenerAdapter implements Feature
         for (Method method : getClass().getDeclaredMethods()) {
             Command command = method.getAnnotation(Command.class);
             if (command != null && command.name().equalsIgnoreCase(target)) {
+                EmbedBuilder builder = new EmbedBuilder()
+                        .setColor(Color.RED);
                 if (!command.permission().isEmpty() && !Marina.getFeature(Permissions.class).hasPermission(event.getUser(), command.permission())) {
-                    event.reply("❌ Insufficient permission: " + command.permission()).queue();
+                    builder.setTitle("❌ Insufficient permission: " + command.permission());
+                    event.replyEmbeds(builder.build()).queue();
                     return;
                 }
 
                 event.deferReply().complete();
+
                 try {
                     method.invoke(this, event);
                 } catch (InvocationTargetException e) {
                     if (e.getCause() instanceof InsufficientPermissionException) {
                         String permission = ((InsufficientPermissionException) e.getCause()).getPermission();
-                        event.getHook().editOriginal("❌ Insufficient permission: " + permission).queue();
+                        builder.setTitle("❌ Insufficient permission: " + permission);
+                        event.getHook().editOriginalEmbeds(builder.build()).queue();
                     } else if (e.getCause() instanceof IllegalArgumentException) {
-                        event.getHook().editOriginal("❌ " + e.getCause().getMessage()).queue();
+                        builder.setTitle("❌ Error")
+                                .setDescription(e.getCause().getMessage());
+                        event.getHook().editOriginalEmbeds(builder.build()).queue();
                     } else {
-                        event.getHook().editOriginal("❌ " + e.getCause().getMessage()).queue();
+                        builder.setTitle("❌ Error")
+                                .setDescription(e.getCause().getMessage());
+                        event.getHook().editOriginalEmbeds(builder.build()).queue();
                         e.printStackTrace();
                     }
                 } catch (Exception e) {
-                    event.getHook().editOriginal("❌ " + e.getCause().getMessage()).queue();
+                    builder.setTitle("❌ Error")
+                            .setDescription(e.getCause().getMessage());
+                    event.getHook().editOriginalEmbeds(builder.build()).queue();
                     e.printStackTrace();
                 }
                 return;
@@ -62,6 +75,7 @@ public abstract class AbstractFeature extends ListenerAdapter implements Feature
     protected boolean hasPermission(ISnowflake snowflake, String permission) {
         return Marina.getFeature(Permissions.class).hasPermission(snowflake, permission);
     }
+
     protected void checkPermission(ISnowflake snowflake, String permission) throws InsufficientPermissionException {
         Marina.getFeature(Permissions.class).checkPermission(snowflake, permission);
     }
