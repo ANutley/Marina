@@ -130,7 +130,10 @@ public class DockerFeature extends AbstractFeature {
             }
         }
 
-        event.getHook().editOriginal("🤔 Creating updater container...").complete();
+        EmbedBuilder builder = new EmbedBuilder()
+                .setColor(Color.YELLOW)
+                .setTitle("🤔 Creating updater container...");
+        event.getHook().editOriginalEmbeds(builder.build()).complete();
         CreateContainerResponse updateContainerCreateResponse = dockerClient.createContainerCmd("containrrr/watchtower")
                 .withCmd("--cleanup", "--run-once", container)
                 .withHostConfig(HostConfig.newHostConfig()
@@ -142,7 +145,8 @@ public class DockerFeature extends AbstractFeature {
                 )
                 .exec();
 
-        event.getHook().editOriginal("🤔 Updating...").complete();
+        builder.setTitle("🤔 Updating...");
+        event.getHook().editOriginalEmbeds(builder.build()).complete();
         dockerClient.startContainerCmd(updateContainerCreateResponse.getId()).exec();
         dockerClient.waitContainerCmd(updateContainerCreateResponse.getId()).exec(new WaitContainerResultCallback() {
             @Override
