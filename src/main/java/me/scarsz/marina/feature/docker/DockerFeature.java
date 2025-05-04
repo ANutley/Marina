@@ -24,10 +24,8 @@ import net.dv8tion.jda.api.interactions.components.selections.SelectOption;
 import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
 
 import java.awt.*;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -58,7 +56,8 @@ public class DockerFeature extends AbstractFeature {
         Set<String> containers = listContainers(nameOption != null ? nameOption.getAsString() : null, event.getUser()).stream()
                 .map(this::getContainerName)
                 .sorted()
-                .collect(Collectors.toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
 
         EmbedBuilder embedBuilder = new EmbedBuilder();
         if (containers.size() > 0) {
@@ -100,7 +99,7 @@ public class DockerFeature extends AbstractFeature {
                                                     .withDescription(container.getImage())
                                     )
                                     .sorted()
-                                    .collect(Collectors.toSet())
+                                    .collect(Collectors.toCollection(LinkedHashSet::new))
                     )
                     .build()
             )).queue();
