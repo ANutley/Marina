@@ -98,7 +98,7 @@ public class DockerFeature extends AbstractFeature {
                                             SelectOption.of("restart-" + container.getId(), getContainerName(container.getId()))
                                                     .withDescription(container.getImage())
                                     )
-                                    .sorted()
+                                    .sorted(Comparator.comparing(SelectOption::getLabel))
                                     .collect(Collectors.toCollection(LinkedHashSet::new))
                     )
                     .build()
